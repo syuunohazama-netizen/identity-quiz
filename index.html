@@ -590,6 +590,7 @@ let totalAttempts = 0;
 let firstTryCorrectCount = 0;
 let currentQuestionAttempts = 0;
 let soundEnabled = true;
+let masterMuted = false;
 let effectsEnabled = true;
 let bgmEnabled = true;
 let bgmVolume = 0.45;
@@ -623,7 +624,7 @@ function getAudioContext() {
   return audioCtx;
 }
 function tone(freq,start,duration,type="sine",gain=.14) {
-  if (!soundEnabled) return;
+  if (!soundEnabled || masterMuted) return;
   const ctx=getAudioContext(), osc=ctx.createOscillator(), g=ctx.createGain();
   osc.type=type; osc.frequency.setValueAtTime(freq,ctx.currentTime+start);
   g.gain.setValueAtTime(.0001,ctx.currentTime+start);
@@ -644,7 +645,7 @@ function showScreen(id) {
 
 function saveGame() {
   localStorage.setItem(SAVE_KEY, JSON.stringify({
-    currentIndex, correctCount, answeredCurrent, startedAt, soundEnabled, effectsEnabled,
+    currentIndex, correctCount, answeredCurrent, startedAt, soundEnabled, masterMuted, effectsEnabled,
     totalAttempts, firstTryCorrectCount, currentQuestionAttempts, bgmEnabled, bgmVolume,
     score, hintUseCount,
     hintElapsedMs: hintStartedAt ? hintElapsedMs + (Date.now()-hintStartedAt) : hintElapsedMs,
@@ -669,6 +670,7 @@ function loadSave() {
     firstTryCorrectCount=data.firstTryCorrectCount||0;
     currentQuestionAttempts=data.currentQuestionAttempts||0;
     soundEnabled=data.soundEnabled!==false;
+    masterMuted=Boolean(data.masterMuted);
     effectsEnabled=data.effectsEnabled!==false;
     bgmEnabled=data.bgmEnabled!==false;
     bgmVolume=typeof data.bgmVolume==="number" ? data.bgmVolume : 0.45;
@@ -700,7 +702,7 @@ function updateTitleMenu() {
 }
 
 function updateSettingsUI() {
-  $("soundToggle").textContent=soundEnabled?"🔊 音あり":"🔇 ミュート";
+  $("soundToggle").textContent=masterMuted?"🔇 ミュート":"🔊 音あり";
   $("seSwitch").classList.toggle("on",soundEnabled);
   $("fxSwitch").classList.toggle("on",effectsEnabled);
   $("bgmSwitch").classList.toggle("on",bgmEnabled);
@@ -906,7 +908,7 @@ function scheduleBgmPattern() {
 }
 
 function playBgm() {
-  if (!bgmEnabled || bgmTimer) return;
+  if (!bgmEnabled || masterMuted || bgmTimer) return;
   getAudioContext();
   scheduleBgmPattern();
   bgmTimer=setInterval(scheduleBgmPattern,4600);
@@ -935,7 +937,7 @@ function fadeOutBgm(duration=700) {
 
 
 function playCountdownTick(value) {
-  if (!soundEnabled) return;
+  if (!soundEnabled || masterMuted) return;
   if (value === "START!") {
     tone(880,0,.11,"square",.08);
     tone(1320,.09,.18,"triangle",.10);
@@ -1279,7 +1281,7 @@ $("closeSettings").addEventListener("click",()=>$("settingsModal").classList.rem
 $("bgmSwitch").addEventListener("click",()=>{
   bgmEnabled=!bgmEnabled;
   updateSettingsUI();
-  if (bgmEnabled) playBgm(); else fadeOutBgm(300);
+  if (bgmEnabled && !masterMuted) playBgm(); else fadeOutBgm(300);
   saveGame();
 });
 $("bgmVolume").addEventListener("input",e=>{
@@ -1289,7 +1291,17 @@ $("bgmVolume").addEventListener("input",e=>{
 });
 $("seSwitch").addEventListener("click",()=>{soundEnabled=!soundEnabled;updateSettingsUI();saveGame();if(soundEnabled)playClick()});
 $("fxSwitch").addEventListener("click",()=>{effectsEnabled=!effectsEnabled;updateSettingsUI();saveGame()});
-$("soundToggle").addEventListener("click",()=>{soundEnabled=!soundEnabled;updateSettingsUI();saveGame();if(soundEnabled)playClick()});
+$("soundToggle").addEventListener("click",()=>{
+  masterMuted=!masterMuted;
+  updateSettingsUI();
+  if(masterMuted){
+    fadeOutBgm(250);
+  }else{
+    if(bgmEnabled) playBgm();
+    if(soundEnabled) playClick();
+  }
+  saveGame();
+});
 
 window.addEventListener("resize",()=>{$("confetti").width=innerWidth;$("confetti").height=innerHeight});
 
