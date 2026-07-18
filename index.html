@@ -589,7 +589,6 @@ let totalAttempts = 0;
 let firstTryCorrectCount = 0;
 let currentQuestionAttempts = 0;
 let soundEnabled = true;
-let masterMuted = false;
 let effectsEnabled = true;
 let bgmEnabled = true;
 let bgmVolume = 0.45;
@@ -623,7 +622,7 @@ function getAudioContext() {
   return audioCtx;
 }
 function tone(freq,start,duration,type="sine",gain=.14) {
-  if (!soundEnabled || masterMuted) return;
+  if (!soundEnabled) return;
   const ctx=getAudioContext(), osc=ctx.createOscillator(), g=ctx.createGain();
   osc.type=type; osc.frequency.setValueAtTime(freq,ctx.currentTime+start);
   g.gain.setValueAtTime(.0001,ctx.currentTime+start);
@@ -644,7 +643,7 @@ function showScreen(id) {
 
 function saveGame() {
   localStorage.setItem(SAVE_KEY, JSON.stringify({
-    currentIndex, correctCount, answeredCurrent, startedAt, soundEnabled, masterMuted, effectsEnabled,
+    currentIndex, correctCount, answeredCurrent, startedAt, soundEnabled, effectsEnabled,
     totalAttempts, firstTryCorrectCount, currentQuestionAttempts, bgmEnabled, bgmVolume,
     score, hintUseCount,
     hintElapsedMs: hintStartedAt ? hintElapsedMs + (Date.now()-hintStartedAt) : hintElapsedMs,
@@ -669,7 +668,6 @@ function loadSave() {
     firstTryCorrectCount=data.firstTryCorrectCount||0;
     currentQuestionAttempts=data.currentQuestionAttempts||0;
     soundEnabled=data.soundEnabled!==false;
-    masterMuted=Boolean(data.masterMuted);
     effectsEnabled=data.effectsEnabled!==false;
     bgmEnabled=data.bgmEnabled!==false;
     bgmVolume=typeof data.bgmVolume==="number" ? data.bgmVolume : 0.45;
@@ -906,7 +904,7 @@ function scheduleBgmPattern() {
 }
 
 function playBgm() {
-  if (!bgmEnabled || masterMuted || bgmTimer) return;
+  if (!bgmEnabled || bgmTimer) return;
   getAudioContext();
   scheduleBgmPattern();
   bgmTimer=setInterval(scheduleBgmPattern,4600);
@@ -935,7 +933,7 @@ function fadeOutBgm(duration=700) {
 
 
 function playCountdownTick(value) {
-  if (!soundEnabled || masterMuted) return;
+  if (!soundEnabled) return;
   if (value === "START!") {
     tone(880,0,.11,"square",.08);
     tone(1320,.09,.18,"triangle",.10);
@@ -1279,7 +1277,7 @@ $("closeSettings").addEventListener("click",()=>$("settingsModal").classList.rem
 $("bgmSwitch").addEventListener("click",()=>{
   bgmEnabled=!bgmEnabled;
   updateSettingsUI();
-  if (bgmEnabled && !masterMuted) playBgm(); else fadeOutBgm(300);
+  if (bgmEnabled) playBgm(); else fadeOutBgm(300);
   saveGame();
 });
 $("bgmVolume").addEventListener("input",e=>{
