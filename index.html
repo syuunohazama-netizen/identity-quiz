@@ -347,7 +347,6 @@ input:focus{border-color:var(--blue);box-shadow:0 0 0 4px rgba(22,135,217,.15)}
     </div>
     <div class="header-actions">
       <span id="headerProgress" class="pill">0 / 1</span>
-      <button id="soundToggle" class="icon-btn" type="button">🔊 音あり</button>
       <button id="settingsBtn" class="icon-btn" type="button">⚙ 設定</button>
     </div>
   </div>
@@ -702,7 +701,6 @@ function updateTitleMenu() {
 }
 
 function updateSettingsUI() {
-  $("soundToggle").textContent=masterMuted?"🔇 ミュート":"🔊 音あり";
   $("seSwitch").classList.toggle("on",soundEnabled);
   $("fxSwitch").classList.toggle("on",effectsEnabled);
   $("bgmSwitch").classList.toggle("on",bgmEnabled);
@@ -1291,17 +1289,6 @@ $("bgmVolume").addEventListener("input",e=>{
 });
 $("seSwitch").addEventListener("click",()=>{soundEnabled=!soundEnabled;updateSettingsUI();saveGame();if(soundEnabled)playClick()});
 $("fxSwitch").addEventListener("click",()=>{effectsEnabled=!effectsEnabled;updateSettingsUI();saveGame()});
-$("soundToggle").addEventListener("click",()=>{
-  masterMuted=!masterMuted;
-  updateSettingsUI();
-  if(masterMuted){
-    fadeOutBgm(250);
-  }else{
-    if(bgmEnabled) playBgm();
-    if(soundEnabled) playClick();
-  }
-  saveGame();
-});
 
 window.addEventListener("resize",()=>{$("confetti").width=innerWidth;$("confetti").height=innerHeight});
 
