@@ -355,7 +355,7 @@ input:focus{border-color:var(--blue);box-shadow:0 0 0 4px rgba(22,135,217,.15)}
 <main>
   <section id="titleScreen" class="screen active">
     <div class="panel hero">
-      <span class="hero-badge">VER.0.2 · QUIZ CHALLENGE</span>
+      <span class="hero-badge">QUIZ CHALLENGE</span>
       <h1>第五人格<br>謎解きチャレンジ</h1>
       <p>画像に隠された答えを見つけ、すべての問題を突破しよう。<br>回答欄ではEnterキーも使用できます。</p>
       <div class="title-buttons">
@@ -1045,7 +1045,7 @@ function startGame() {
   playBgm();
   showScreen("quizScreen");
   renderQuestion();
-  if (!answeredCurrent) runCountdown();
+  if (!answeredCurrent) renderQuestion();
   saveGame();
 }
 
@@ -1220,7 +1220,7 @@ function restartGame() {
   totalAttempts=0;firstTryCorrectCount=0;currentQuestionAttempts=0;
   playBgm();
   showScreen("quizScreen");renderQuestion();saveGame();
-  runCountdown();
+  renderQuestion();
 }
 
 $("hintBtn").addEventListener("click",openHint);
