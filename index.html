@@ -592,6 +592,12 @@ let soundEnabled = true;
 let effectsEnabled = true;
 let bgmEnabled = true;
 let bgmVolume = 0.45;
+const bgmAudio = new Audio("BBGGMM.m4a");
+bgmAudio.loop = true;
+bgmAudio.preload = "auto";
+bgmAudio.volume = bgmVolume;
+let bgmFadeTimer = null;
+let bgmDuckTimer = null;
 let audioCtx = null;
 let bgmTimer = null;
 let bgmMaster = null;
@@ -703,7 +709,7 @@ function updateSettingsUI() {
   $("fxSwitch").classList.toggle("on",effectsEnabled);
   $("bgmSwitch").classList.toggle("on",bgmEnabled);
   $("bgmVolume").value=Math.round(bgmVolume*100);
-  if (bgmMaster) bgmMaster.gain.value=bgmVolume*2.07;
+  bgmAudio.volume=bgmVolume;
 }
 
 
@@ -783,152 +789,52 @@ function renderQuestion() {
 }
 
 
-function ensureBgmGraph() {
-  const ctx=getAudioContext();
-  if (bgmMaster) return;
-
-  bgmMaster=ctx.createGain();
-  bgmMaster.gain.value=bgmVolume*2.07;
-
-  bgmMusicBus=ctx.createGain();
-  bgmMusicBus.gain.value=1;
-
-  bgmDry=ctx.createGain();
-  bgmDry.gain.value=.82;
-
-  bgmWet=ctx.createGain();
-  bgmWet.gain.value=.24;
-
-  const delayA=ctx.createDelay(.5);
-  const delayB=ctx.createDelay(.5);
-  delayA.delayTime.value=.17;
-  delayB.delayTime.value=.29;
-
-  const feedbackA=ctx.createGain();
-  const feedbackB=ctx.createGain();
-  feedbackA.gain.value=.18;
-  feedbackB.gain.value=.12;
-
-  const compressor=ctx.createDynamicsCompressor();
-  compressor.threshold.value=-18;
-  compressor.knee.value=18;
-  compressor.ratio.value=4;
-  compressor.attack.value=.01;
-  compressor.release.value=.25;
-
-  bgmMusicBus.connect(bgmDry).connect(bgmMaster);
-  bgmMusicBus.connect(delayA);
-  delayA.connect(feedbackA).connect(delayB);
-  delayB.connect(feedbackB).connect(delayA);
-  delayA.connect(bgmWet);
-  delayB.connect(bgmWet);
-  bgmWet.connect(bgmMaster);
-  bgmMaster.connect(compressor).connect(ctx.destination);
-}
-
-function playBgmNote(freq, when, duration, gain=.11, type="sine", pan=0, detune=0) {
-  if (!bgmEnabled) return;
-  const ctx=getAudioContext();
-  ensureBgmGraph();
-
-  const osc=ctx.createOscillator();
-  const g=ctx.createGain();
-  const panner=ctx.createStereoPanner();
-
-  osc.type=type;
-  osc.frequency.setValueAtTime(freq,when);
-  osc.detune.setValueAtTime(detune,when);
-  panner.pan.setValueAtTime(pan,when);
-
-  g.gain.setValueAtTime(.0001,when);
-  g.gain.exponentialRampToValueAtTime(gain,when+.08);
-  g.gain.exponentialRampToValueAtTime(.0001,when+duration);
-
-  osc.connect(g).connect(panner).connect(bgmMusicBus);
-  osc.start(when);
-  osc.stop(when+duration+.08);
-}
-
 function duckBgm(level=.35, hold=500, recover=700) {
-  if (!bgmMusicBus) return;
-  const ctx=getAudioContext();
-  const now=ctx.currentTime;
-  bgmMusicBus.gain.cancelScheduledValues(now);
-  bgmMusicBus.gain.setValueAtTime(Math.max(.0001,bgmMusicBus.gain.value),now);
-  bgmMusicBus.gain.exponentialRampToValueAtTime(level,now+.06);
-  bgmMusicBus.gain.setValueAtTime(level,now+hold/1000);
-  bgmMusicBus.gain.exponentialRampToValueAtTime(1,now+(hold+recover)/1000);
-}
-
-function scheduleBgmPattern() {
-  if (!bgmEnabled) return;
-  const ctx=getAudioContext();
-  ensureBgmGraph();
-  const now=ctx.currentTime+.05;
-
-  const chords=[
-    [146.83,174.61,220.00,73.42],
-    [130.81,164.81,196.00,65.41],
-    [123.47,146.83,185.00,61.74],
-    [110.00,138.59,164.81,55.00]
-  ];
-
-  const chord=chords[bgmStep%chords.length];
-
-  // Warm string-like pad, spread across stereo field.
-  chord.slice(0,3).forEach((f,i)=>{
-    const pan=[-.45,0,.45][i];
-    playBgmNote(f,now,4.7,.078/(i+1),"triangle",pan,-4);
-    playBgmNote(f,now,4.7,.036/(i+1),"sawtooth",pan,4);
-  });
-
-  // Low bass foundation.
-  playBgmNote(chord[3],now,4.6,.12,"sine",-0.08,0);
-  playBgmNote(chord[3]/2,now,4.6,.045,"triangle",0.08,0);
-
-  // Bell motifs, slightly louder and wider.
-  playBgmNote(chord[1]*2,now+1.0,1.55,.072,"sine",.55,0);
-  playBgmNote(chord[1]*4,now+1.0,1.15,.028,"sine",.65,6);
-  playBgmNote(chord[2]*2,now+3.0,1.35,.062,"sine",-.55,0);
-  playBgmNote(chord[2]*4,now+3.0,1.0,.024,"sine",-.65,-6);
-
-  // Gentle breathing pulse.
-  if (bgmMusicBus) {
-    bgmMusicBus.gain.cancelScheduledValues(now);
-    bgmMusicBus.gain.setValueAtTime(.94,now);
-    bgmMusicBus.gain.linearRampToValueAtTime(1.02,now+2.3);
-    bgmMusicBus.gain.linearRampToValueAtTime(.96,now+4.6);
-  }
-
-  bgmStep++;
+  if (bgmAudio.paused || !bgmEnabled) return;
+  clearTimeout(bgmDuckTimer);
+  const normalVolume=bgmVolume;
+  bgmAudio.volume=Math.max(0,Math.min(1,normalVolume*level));
+  bgmDuckTimer=setTimeout(()=>{
+    const started=Date.now();
+    const from=bgmAudio.volume;
+    const timer=setInterval(()=>{
+      const t=Math.min(1,(Date.now()-started)/recover);
+      bgmAudio.volume=from+(normalVolume-from)*t;
+      if(t>=1) clearInterval(timer);
+    },30);
+  },hold);
 }
 
 function playBgm() {
-  if (!bgmEnabled || bgmTimer) return;
-  getAudioContext();
-  scheduleBgmPattern();
-  bgmTimer=setInterval(scheduleBgmPattern,4600);
-}
-
-function stopBgm() {
-  if (bgmTimer) {
-    clearInterval(bgmTimer);
-    bgmTimer=null;
+  if (!bgmEnabled) return;
+  clearInterval(bgmFadeTimer);
+  bgmAudio.volume=bgmVolume;
+  const promise=bgmAudio.play();
+  if (promise && typeof promise.catch==="function") {
+    promise.catch(()=>{});
   }
 }
 
+function stopBgm() {
+  clearInterval(bgmFadeTimer);
+  bgmAudio.pause();
+}
+
 function fadeOutBgm(duration=700) {
-  stopBgm();
-  if (!bgmMaster) return;
-  const ctx=getAudioContext();
-  const start=Math.max(0.0001,bgmMaster.gain.value);
-  bgmMaster.gain.cancelScheduledValues(ctx.currentTime);
-  bgmMaster.gain.setValueAtTime(start,ctx.currentTime);
-  bgmMaster.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+duration/1000);
-  setTimeout(()=>{
-    if (bgmMaster) bgmMaster.gain.value=bgmVolume*2.07;
-    if (bgmMusicBus) bgmMusicBus.gain.value=1;
-  },duration+80);
+  clearInterval(bgmFadeTimer);
+  if (bgmAudio.paused) return;
+  const startVolume=bgmAudio.volume;
+  const started=Date.now();
+  bgmFadeTimer=setInterval(()=>{
+    const t=Math.min(1,(Date.now()-started)/duration);
+    bgmAudio.volume=startVolume*(1-t);
+    if(t>=1){
+      clearInterval(bgmFadeTimer);
+      bgmFadeTimer=null;
+      bgmAudio.pause();
+      bgmAudio.volume=bgmVolume;
+    }
+  },30);
 }
 
 
@@ -1282,7 +1188,7 @@ $("bgmSwitch").addEventListener("click",()=>{
 });
 $("bgmVolume").addEventListener("input",e=>{
   bgmVolume=Number(e.target.value)/100;
-  if (bgmMaster) bgmMaster.gain.value=bgmVolume*2.07;
+  bgmAudio.volume=bgmVolume;
   saveGame();
 });
 $("seSwitch").addEventListener("click",()=>{soundEnabled=!soundEnabled;updateSettingsUI();saveGame();if(soundEnabled)playClick()});
